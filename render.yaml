@@ -1,0 +1,51 @@
+# Render Blueprint for ChannelFlow AI.
+#
+# This deploys the bot as a Background Worker - the correct service
+# type here, since main.py long-polls Telegram and never listens on an
+# HTTP port (a Web Service would fail Render's "no open port detected"
+# check and keep restarting).
+#
+# A small persistent disk is attached so channelflow.db (your projects,
+# sources, destinations, settings, logs, stats) survives redeploys and
+# restarts. The Telethon login itself does NOT need the disk - it's
+# read from the SESSION_STRING environment variable instead (see
+# core/export_session.py and the README's "Deploy to Render" section).
+#
+# Deploy: push this repo to GitHub, then in the Render Dashboard choose
+# New -> Blueprint and point it at the repo.
+
+services:
+  - type: worker
+    name: channelflow-ai
+    runtime: python
+    plan: starter
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    autoDeploy: true
+
+    disk:
+      name: channelflow-data
+      mountPath: /var/data
+      sizeGB: 1
+
+    envVars:
+      # Secrets - set these in the Render Dashboard, not in this file.
+      - key: BOT_TOKEN
+        sync: false
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: SESSION_STRING
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+
+      # Non-secret - point the DB at the persistent disk so it's not
+      # wiped on every deploy. SESSION_NAME is unused once
+      # SESSION_STRING is set, but kept for local-dev fallback.
+      - key: DB_NAME
+        value: /var/data/channelflow.db
+      - key: SESSION_NAME
+        value: /var/data/ChannelFlow
